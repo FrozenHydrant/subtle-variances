@@ -14,14 +14,13 @@ def true_speed_increase(seg, increment):
 
     return seg._spawn(array.array(song.array_type, new_array))
 
-#def copy_in_nomp3ordiffs(start, end, excluded):
-#    for (dirpath, dirnames, filenames) in os.walk(start):
-#        for file_name in filenames:
-#            if file_name.split(".")[1] != "osu" and file_name != excluded:
-#                print("TOCOPY:" + os.path.join(start, file_name))
-#                print("DEST " + end)
-#                shutil.copy(os.path.join(start, file_name), end)
-
+def verify_diffname(my_file, target_diffname):
+    my_line = my_file.readline()
+    while "Version:" not in my_line:
+        my_line = my_file.readline()
+    diffname = my_line.split(":")[1].strip("\n")
+    return diffname == target_diffname
+    
 arg_count = len(sys.argv)
 
 if arg_count < 4:
@@ -31,22 +30,29 @@ else:
     diffname = sys.argv[2]
     true_file_name = ""
 
-    #finding the filename of the difficulty we want
+    #finding the filename of the difficulty we want (loosely)
     for (dirpath, dirnames, filenames) in os.walk(path):
         for file_name in filenames:
             if file_name.split(".")[1] == "osu":
-                if diffname in file_name[file_name.rindex("[")::]:
-                    true_file_name = file_name
-                    break
+                if diffname in file_name:
+                    with open(os.path.join(path, file_name), "r", encoding="utf-8") as opened_file:
+                        # Then verify the diffname is correct (tightly)
+                        if verify_diffname(opened_file, diffname):
+                            true_file_name = file_name
         break
-
-    author, title = true_file_name.split(".")[0][:true_file_name.rindex("("):].split("-")
-    new_diffname = ""
 
     #open the osu file to read contents
     opened_file = open(os.path.join(path, true_file_name), "r", encoding="utf-8")
     opened_file_contents = opened_file.read()
     opened_file.close()
+
+    # get metadata
+    title_index = opened_file_contents.index("Title:")
+    title = opened_file_contents[title_index+len("Title:"):opened_file_contents.index("\n",title_index):]
+    artist_index = opened_file_contents.index("Artist:")
+    artist = opened_file_contents[artist_index+len("Artist:"):opened_file_contents.index("\n",artist_index):]
+    host_index = opened_file_contents.index("Creator:")
+    host = opened_file_contents[host_index+len("Creator:"):opened_file_contents.index("\n",host_index):]
 
     #get the audio file name, it's audio.mp3 like 99% of the time
     file_name_index = opened_file_contents.index("AudioFilename: ")
@@ -70,7 +76,7 @@ else:
 
         #generating a title
         song.export(new_diffname + ".mp3", format="mp3")
-        with open(new_diffname + ".osu", "w+", encoding="utf-8") as osufile:
+        with open(artist + " - " + title + " (" + host + ") [" + new_diffname + "]" + ".osu", "w+", encoding="utf-8") as osufile:
             innards = opened_file_contents.split("\n")
             i = -1
             while i < len(innards):
